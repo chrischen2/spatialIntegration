@@ -107,7 +107,7 @@ total_inh = inh + inh2;
 synapseMod = @(preStrength) preStrength * total_inh; 
 
 preStrengthValues = 0.1:0.2:1;
-colors_preStrength = pmkmp(length(preStrengthValues),'IsoL'); 
+colors_preStrength = createColorMap(length(preStrengthValues)); 
 
 % Pre-allocate graphic handles and legend entries
 resp_lines = gobjects(length(preStrengthValues), 1);
@@ -150,7 +150,7 @@ sgtitle('Presyn Strength Analysis', 'FontSize', 14);
 %% Second simulation: Inhibition sensitivity (beta analysis)
 figHandles.betaFig = figure('Position', [100 600 1200 500]);
 betaValues = [1 2 4 8 16];
-colors_beta = pmkmp(length(betaValues),'IsoL');
+colors_beta = createColorMap(length(betaValues));
 
 subplot(2,1,1);
 ax3 = gca;
@@ -274,3 +274,10 @@ function conv_result = temporal_filter_signal(signal, filter)
     end
     conv_result = convResult(filterLen+1:end-filterLen);
 end
+
+%--------------------------------------------------------------------------
+function colors = createColorMap(numColors)
+    colors = jet(numColors);
+end
+
+%------------

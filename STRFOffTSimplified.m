@@ -13,7 +13,7 @@
 %   Date: December 2024
 %
 %   For further details on the dynamic synapse mechanism and supporting data,
-%   please see Chen, et al. 2025.
+%   please see Chen, et al. 2025.ƒ
 
 
 %% INITIALIZATION AND PARAMETER SETUP
