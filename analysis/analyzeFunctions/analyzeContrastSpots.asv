@@ -1,0 +1,155 @@
+function output = analyzeContrastSpots(selectedNodes, paras)
+% Input: 
+% selectedNodes - array of nodes
+% paras - structure with parameters
+
+% Initialize figure for overlay plotting
+f = figure('color', 'w', 'position', [200 300 1000 750]);
+ax(1) = subplot(2, 2, 1); 
+hold(ax(1), 'on');
+ax(2) = subplot(2, 2, 2); 
+hold(ax(2), 'on');
+ax(3) = subplot(2, 2, [3, 4]);
+hold(ax(3), 'on');
+
+colors = ['r', 'k', 'b'];
+baseline = zeros(1, length(selectedNodes));
+
+for nodeIdx = 1:length(selectedNodes)
+    selectedNode = selectedNodes{nodeIdx};
+    resMat = riekesuite.getResponseMatrix(selectedNode.epochList, 'Amp1');
+    
+    baselineValues = mean(resMat(:, 1:paras.prePts), 2);
+    if strcmp(selectedNode.parent.parent.splitValue, 'exc')
+        paras.epochRange = find(baselineValues < 0);
+    elseif strcmp(selectedNode.parent.parent.splitValue, 'inh')
+        paras.epochRange = find(baselineValues > 0);
+    else
+        error('Unknown splitValue. Expected ''exc'' or ''inh''.');
+    end
+    
+    resMat = resMat(paras.epochRange, :);
+    baseline(nodeIdx) = mean(mean(resMat(:, 1:paras.prePts), 2));
+    
+    spotContrast = zeros(1, selectedNode.epochList.length);
+    for i = 1:length(spotContrast)
+        spotContrast(i) = selectedNode.epochList.elements(i).protocolSettings('currentSpotContrast');
+    end
+    
+    paras.epochRange = 1:size(resMat, 1);
+    spotContrast = spotContrast(paras.epochRange);
+    contrastArray = unique(spotContrast);
+    
+    if strcmp(selectedNode.epochList.firstValue.protocolSettings('onlineAnalysis'), 'extracellular') || paras.spikeTag
+        for i = 1:size(resMat, 1)
+            resMat(i, :) = resMat(i, :) - movmedian(resMat(i, :), 100);
+        end
+        [spikeTimes, ~, ~] = SpikeDetectorNew(resMat, 'thresholdSpikeFactor', paras.spikeTh);
+        trace = spikeTimeToPSTH(resMat, spikeTimes, paras.psthSigma, paras.sampleRate);
+    else
+        for i = 1:size(resMat, 1)
+            resMat(i, :) = smooth(resMat(i, :), 100);
+        end
+        trace = resMat - repmat(mean(resMat(:, 1:paras.prePts), 2), 1, size(resMat, 2));
+    end
+    
+    resArray = zeros(1, length(contrastArray));
+    mTraceArray = zeros(length(contrastArray), size(resMat, 2));
+    
+    for i = 1:length(contrastArray)
+        contrastMask = contrastArray(i) == spotContrast;
+        
+        if strcmp(selectedNode.epochList.firstValue.protocolSettings('onlineAnalysis'), 'extracellular') || paras.spikeTag
+            temp = cellfun(@(x) length(x(x > paras.prePts & x < paras.prePts + paras.stimPts)), spikeTimes(contrastMask));
+        else  
+            temp = mean(trace(contrastMask, paras.prePts:paras.prePts + paras.stimPts), 2) * paras.stimPts / (1e4);
+        end
+        
+        resArray(i) = mean(temp);
+        
+        if length(temp) > 1
+            mTraceArray(i, :) = mean(trace(contrastMask, :), 1);
+        else
+            mTraceArray(i, :) = trace(contrastMask, :);
+        end
+    end
+    
+    nodeColor = colors(mod(nodeIdx-1, length(colors)) + 1);
+    for i = 1:size(mTraceArray, 1)
+        plot(ax(1), (1:size(mTraceArray, 2))/paras.sampleRate, mTraceArray(i, :), ...
+            'linewidth', 1, 'color', nodeColor, 'DisplayName', '');
+    end
+    
+    plot(ax(2), contrastArray, resArray, '-o', 'linewidth', 2, 'DisplayName', ['Node ' num2str(selectedNode.splitValue)]);
+    
+    % Compute differentiation of each row in mTraceArray
+    diffTraceArray = diff(mTraceArray, 1, 2) * paras.sampleRate;
+    
+    % Select only negative contrasts
+    negativeContrastMask = contrastArray < -0.4;
+    negativeContrastDiffTraces = diffTraceArray(negativeContrastMask, :);
+    
+    % Normalize each negative contrast trace individually
+    normalizedNegativeContrastDiffTraces = zeros(size(negativeContrastDiffTraces));
+    for i = 1:size(negativeContrastDiffTraces, 1)
+        minValue = min(negativeContrastDiffTraces(i, paras.prePts:paras.prePts+paras.stimPts-1));
+        normalizedNegativeContrastDiffTraces(i, :) = negativeContrastDiffTraces(i, :) / abs(minValue);
+    end
+    
+    timeAxis = (1:size(diffTraceArray, 2)) / paras.sampleRate;
+    
+    % Plot normalized differentiated traces for negative contrasts
+    for i = 1:size(normalizedNegativeContrastDiffTraces, 1)
+        plot(ax(3), timeAxis, normalizedNegativeContrastDiffTraces(i, :), 'linewidth', 1, 'color', 'b', 'DisplayName', '');
+    end
+    
+    % Compute and plot mean normalized differentiated trace for negative contrasts
+    meanNormalizedNegativeContrastDiffTrace = mean(normalizedNegativeContrastDiffTraces, 1);
+    temporalFilter = meanNormalizedNegativeContrastDiffTrace(paras.prePts:paras.prePts+paras.stimPts-1);
+            % Time vector for the temporal filter
+            t = (0:length(temporalFilter)-1) / paras.sampleRate;
+    plot(ax(3), timeAxis, meanNormalizedNegativeContrastDiffTrace, 'linewidth', 3, 'color', nodeColor, 'DisplayName', ['Node ' num2str(selectedNode.splitValue)]);
+    
+    output{nodeIdx}.resArray = resArray;
+    output{nodeIdx}.diffTraceArray = diffTraceArray;
+    output{nodeIdx}.normalizedNegativeContrastDiffTraces = normalizedNegativeContrastDiffTraces;
+    output{nodeIdx}.meanNormalizedNegativeContrastDiffTrace = meanNormalizedNegativeContrastDiffTrace;
+    output{nodeIdx}.temporalFilter = temporalFilter;
+end
+
+if length(selectedNodes) == 2
+    if baseline(1) < 0 && baseline(2) > 0
+        excIdx = 1;
+        inhIdx = 2;
+    elseif baseline(2) < 0 && baseline(1) > 0
+        excIdx = 2;
+        inhIdx = 1;
+    else
+        error('Both nodes have the same sign for baseline. Cannot assign Exc/Inh.');
+    end
+    
+    maxExc = max(abs(output{excIdx}.resArray));
+    maxInh = max(abs(output{inhIdx}.resArray));
+    
+    ieRatio = maxInh / maxExc;
+    output{1}.ieRatio = ieRatio;
+    output{2}.ieRatio = ieRatio;
+    
+    disp(['I/E Ratio: ', num2str(ieRatio)]);
+end
+
+legend(ax(1), 'off');
+initFig(ax(1), 'Time (s)', 'pA');
+legend(ax(2), 'show');
+initFig(ax(2), 'Contrast', 'Integrated Response (pC)');  
+box(ax(2), 'off');
+legend(ax(3), 'show');
+initFig(ax(3), 'Time (s)', 'Normalized Rate of Change (Negative Contrasts)');
+box(ax(3), 'off');
+setAxes(f);
+
+hold(ax(1), 'off');
+hold(ax(2), 'off');
+hold(ax(3), 'off');
+
+end
