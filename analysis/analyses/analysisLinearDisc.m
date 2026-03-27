@@ -1,4 +1,4 @@
-% runLinearDisc.m - Linear equivalent disc analysis
+% analysisLinearDisc.m - Linear equivalent disc analysis
 %   Paper reference: Figures 1-2 (NLI, natural image patches vs discs)
 %   Requires: main.m to be run first (sets up listSorted, gui, summaryFolder)
 %
@@ -6,23 +6,6 @@
 %   Index (NLI) for onset and offset, comparing natural image patches with
 %   uniform discs. Includes population summaries, drug experiments, and
 %   cluster analysis.
-
-%% Create GUI for Linear Disc / Flashed Grating
-cellTypeSplit = @(listSorted)splitOnCellType(listSorted);
-cellTypeSplit_java = riekesuite.util.SplitValueFunctionAdapter.buildMap(listSorted, cellTypeSplit);
-
-dateSplit = @(listSorted)splitOnExperimentDate(listSorted);
-dateSplit_java = riekesuite.util.SplitValueFunctionAdapter.buildMap(listSorted, dateSplit);
-
-ndfSplit = @(listSorted)splitOnNDFs(listSorted);
-ndfSplit_java = riekesuite.util.SplitValueFunctionAdapter.buildMap(listSorted, ndfSplit);
-
-brightnessSplit = @(listSorted)splitOnDeviceBrightNess(listSorted);
-brightnessSplit_java = riekesuite.util.SplitValueFunctionAdapter.buildMap(listSorted, brightnessSplit);
-
-tree = riekesuite.analysis.buildTree(listSorted,{cellTypeSplit_java,dateSplit_java, 'cell.label', 'protocolSettings(epochGroup:label)',...
-    brightnessSplit_java, ndfSplit_java,'protocolSettings(onlineAnalysis)'});
-gui = epochTreeGUI(tree);
 
 %% Analyze linear disc
 selectedNodes = gui.getSelectedEpochTreeNodes;

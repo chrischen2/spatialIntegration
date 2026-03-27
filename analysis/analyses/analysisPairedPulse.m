@@ -1,24 +1,9 @@
-% runPPSpots.m - Paired-pulse spot analysis
-%   Paper reference: Figure 7A-H (paired-pulse facilitation, intervals)
-%   Requires: main.m to be run first (sets up listSorted, summaryFolder)
+% analysisPairedPulse.m - Paired-pulse analysis (spots + gratings)
+%   Paper reference: Figure 7A-H (PP spots), Figure 7I-N (PP gratings)
+%   Requires: main.m to be run first (sets up listSorted, gui, summaryFolder)
 %
-%   Analyzes paired-pulse spot experiments with variable mean luminance
-%   and variable pulse intervals. Includes drug conditions, population
-%   visualization of pulse ratios, and interval-dependent recovery.
-
-%% Create GUI for PP spots
-rigSplit = @(listSorted)splitOnRigs(listSorted);
-rigSplit_java = riekesuite.util.SplitValueFunctionAdapter.buildMap(listSorted, rigSplit);
-
-cellTypeSplit = @(listSorted)splitOnCellType(listSorted);
-cellTypeSplit_java = riekesuite.util.SplitValueFunctionAdapter.buildMap(listSorted, cellTypeSplit);
-
-dateSplit = @(listSorted)splitOnExperimentDate(listSorted);
-dateSplit_java = riekesuite.util.SplitValueFunctionAdapter.buildMap(listSorted, dateSplit);
-
-tree = riekesuite.analysis.buildTree(listSorted,{cellTypeSplit_java, dateSplit_java,rigSplit_java,'protocolSettings(psth)', ...
-    'cell.label','protocolSettings(epochGroup:label)'});
-gui = epochTreeGUI(tree);
+%   Analyzes paired-pulse spot and grating experiments with variable mean
+%   luminance and intervals. Includes drug conditions and population summaries.
 
 %% Analyze PP spot variable mean with drug
 clc;
@@ -303,40 +288,16 @@ fprintf('- Excitatory cells: %d\n', length(excCells));
 fprintf('- Spike recordings: %d\n', length(spikeCells));
 fprintf('- Inhibitory cells: %d\n', length(inhCells));
 
-% Helper function to compute stats
-function [means, sems, counts, allIntervals] = computeStats(ppSpotsInterval, cellIdxs, valueFcn)
-    allIntervals = unique(cell2mat(arrayfun(@(x) x.intervalArray, ppSpotsInterval(cellIdxs), 'UniformOutput', false)));
-    allIntervals = sort(allIntervals);
-    means = zeros(size(allIntervals));
-    sems = zeros(size(allIntervals));
-    counts = zeros(size(allIntervals));
-    for intIdx = 1:length(allIntervals)
-        currentInterval = allIntervals(intIdx);
-        values = [];
-        for cellIdx = cellIdxs
-            intervalIdx = find(ppSpotsInterval(cellIdx).intervalArray == currentInterval);
-            if ~isempty(intervalIdx)
-                values = [values, valueFcn(ppSpotsInterval(cellIdx), intervalIdx)];
-            end
-        end
-        if ~isempty(values)
-            means(intIdx) = mean(values);
-            sems(intIdx) = std(values) / sqrt(length(values));
-            counts(intIdx) = length(values);
-        end
-    end
-end
-
-[excRatioMeans, excRatioSEMs, excRatioCounts, excIntervals] = computeStats(ppSpotsInterval, excCells, ...
+[excRatioMeans, excRatioSEMs, excRatioCounts, excIntervals] = computePPStats(ppSpotsInterval, excCells, ...
     @(cell, idx) cell.amp2(idx) / cell.amp1(idx));
-[excBaselineMeans, excBaselineSEMs, excBaselineCounts, ~] = computeStats(ppSpotsInterval, excCells, ...
+[excBaselineMeans, excBaselineSEMs, excBaselineCounts, ~] = computePPStats(ppSpotsInterval, excCells, ...
     @(cell, idx) cell.secondPulseBaselines(idx));
-[spikeRatioMeans, spikeRatioSEMs, spikeRatioCounts, spikeIntervals] = computeStats(ppSpotsInterval, spikeCells, ...
+[spikeRatioMeans, spikeRatioSEMs, spikeRatioCounts, spikeIntervals] = computePPStats(ppSpotsInterval, spikeCells, ...
     @(cell, idx) cell.amp2(idx) / cell.amp1(idx));
 if ~isempty(inhCells)
-    [inhRatioMeans, inhRatioSEMs, inhRatioCounts, inhIntervals] = computeStats(ppSpotsInterval, inhCells, ...
+    [inhRatioMeans, inhRatioSEMs, inhRatioCounts, inhIntervals] = computePPStats(ppSpotsInterval, inhCells, ...
         @(cell, idx) cell.amp2(idx) / cell.amp1(idx));
-    [inhBaselineMeans, inhBaselineSEMs, inhBaselineCounts, ~] = computeStats(ppSpotsInterval, inhCells, ...
+    [inhBaselineMeans, inhBaselineSEMs, inhBaselineCounts, ~] = computePPStats(ppSpotsInterval, inhCells, ...
         @(cell, idx) cell.secondPulseBaselines(idx));
 end
 
@@ -417,3 +378,88 @@ ylabel('amp2/amp1 Ratio');
 title('Paired-Pulse Recovery: All Recording Types');
 legend('show', 'Location', 'best');
 grid on;
+
+%% ===== Paired-Pulse Gratings (Figure 7I-N) =====
+
+%% Analyze grating with variable mean
+clc;
+clear ppGratingsMean
+paras.saveCell=0;
+CloseAllFiguresExceptGUI;
+paras.psthSigma=10;
+paras.spikeTh=1.2;
+paras.sampleRate=1e4;
+selectedNodes = gui.getSelectedEpochTreeNodes;
+stimTime=selectedNodes{1}.epochList.firstValue.protocolSettings('stimTime');
+preTime=selectedNodes{1}.epochList.firstValue.protocolSettings('preTime');
+tailTime=selectedNodes{1}.epochList.firstValue.protocolSettings('tailTime');
+flashDuration=selectedNodes{1}.epochList.firstValue.protocolSettings('grateDuration');
+paras.flashContrast=selectedNodes{1}.epochList.firstValue.protocolSettings('grateContrast');
+pulseIntervals=selectedNodes{1}.epochList.firstValue.protocolSettings('pulseIntervals');
+paras.psth=selectedNodes{1}.epochList.firstValue.protocolSettings('psth');
+timeToPts=@(x) x/1e3*paras.sampleRate;
+paras.stimPts=timeToPts(stimTime);
+paras.prePts=timeToPts(preTime);
+paras.tailPts=timeToPts(tailTime);
+paras.flashPts=timeToPts(flashDuration);
+paras.intervalPts=timeToPts(pulseIntervals);
+stats=analyzePPGratingsMean(selectedNodes{1},paras);
+
+% Save stats for population analysis
+if paras.saveCell
+    numCells=0;
+    try
+        load(fullfile(summaryFolder, 'ppGratingsMean.mat'));
+        numCells=numel(ppGratingsMean);
+    end
+    ppGratingsMean(numCells+1)=struct('contrastArray',stats.contrastArray, 'ratio1',stats.ratio1, 'ratio2',stats.ratio2, 'amp1', stats.amp1, ...
+        'amp2', stats.amp2, 'amp3', stats.amp3,'amp4', stats.amp4);
+    save(fullfile(summaryFolder, 'ppGratingsMean.mat'),'ppGratingsMean');
+end
+
+%% Plot summary for PP gratings mean
+load(fullfile(summaryFolder, 'ppGratingsMeanSpike.mat'),'ppGratingsMean');
+
+for i=1:size(ppGratingsMean,2)
+    tp1(i,:)=ppGratingsMean(i).amp2(1:2) ;
+    tp2(i,:)=ppGratingsMean(i).amp4(1:2);
+end
+figure; hold all;
+errorbar(ppGratingsMean(1).contrastArray(1:2)*100, mean(tp1), std(tp1)/sqrt(size(tp1,1)));
+errorbar(ppGratingsMean(1).contrastArray(1:2)*100, mean(tp2), std(tp2)/sqrt(size(tp2,1)));
+initFig(gca,'step Contrast', 'amplitude');
+
+%% Analyze grating with variable intervals
+clc;
+clear ppGratingsInterval
+paras.saveCell=0;
+CloseAllFiguresExceptGUI;
+paras.psthSigma=10;
+paras.spikeTh=1.2;
+paras.sampleRate=1e4;
+selectedNodes = gui.getSelectedEpochTreeNodes;
+stimTime=selectedNodes{1}.epochList.firstValue.protocolSettings('stimTime');
+preTime=selectedNodes{1}.epochList.firstValue.protocolSettings('preTime');
+tailTime=selectedNodes{1}.epochList.firstValue.protocolSettings('tailTime');
+flashDuration=selectedNodes{1}.epochList.firstValue.protocolSettings('grateDuration');
+paras.flashContrast=selectedNodes{1}.epochList.firstValue.protocolSettings('grateContrast');
+paras.stepContrast=selectedNodes{1}.epochList.firstValue.protocolSettings('stepContrast');
+paras.psth=selectedNodes{1}.epochList.firstValue.protocolSettings('psth');
+timeToPts=@(x) x/1e3*paras.sampleRate;
+paras.stimPts=timeToPts(stimTime);
+paras.prePts=timeToPts(preTime);
+paras.tailPts=timeToPts(tailTime);
+paras.flashPts=timeToPts(flashDuration);
+stats=analyzePPGratingsInterval(selectedNodes{1},paras);
+
+% Save stats for population analysis
+if paras.saveCell
+    numCells=0;
+    try
+        load(fullfile(summaryFolder, 'ppGratingsInterval.mat'));
+        numCells=numel(ppGratingsInterval);
+    end
+    ppGratingsInterval(numCells+1)=struct('contrastArray',stats.contrastArray, 'ratio1',stats.ratio1, 'ratio2',stats.ratio2, 'amp1', stats.amp1, ...
+        'amp2', stats.amp2, 'amp3', stats.amp3,'amp4', stats.amp4);
+    save(fullfile(summaryFolder, 'ppGratingsInterval.mat'),'ppGratingsInterval');
+end
