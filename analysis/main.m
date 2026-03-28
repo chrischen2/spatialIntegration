@@ -28,7 +28,6 @@
 %   analysisCRG.m                - Fig 4, 6C (contrast reversing grating, E/I)
 %   analysisRFCharacterization.m - Fig 6A-B, Supp Fig 3A (expanding spots, contrast)
 %   analysisPairedPulse.m        - Fig 7     (paired-pulse spots & gratings)
-%   analysisSupplementary.m      - Methods, Supp Fig 5 (centering, noise/LN model)
 
 clearvars; close all; clc;
 
@@ -49,11 +48,11 @@ treeFactory = edu.washington.rieke.Analysis.getEpochTreeFactory();
 listFactory = edu.washington.rieke.Analysis.getEpochListFactory();
 
 % Configure data paths (adjust to your local data location)
-dataFolder = fullfile(fileparts(mfilename('fullpath')), 'data');
-ovaExportFolder = dataFolder;
+dataFolder = '/Users/chrischen/Library/CloudStorage/Dropbox/research/projects/spatialIntegration';
+ovaExportFolder = '/Users/chrischen/Library/CloudStorage/Dropbox/research/projects/spatialIntegration';
 
 %% Load epoch list and sort chronologically
-list = loader.loadEpochList([ovaExportFolder filesep 'LinearEqvDisc.mat'], dataFolder);
+list = loader.loadEpochList([ovaExportFolder filesep 'LinearEqvDiscChris.mat'], dataFolder);
 for i = 1:list.length
     try
         list.elements(i).setProtocolSetting('user:startDate', ...
@@ -90,110 +89,17 @@ gui = epochTreeGUI(tree);
 
 %% ===== Fig 4, 6C: Contrast Reversing Grating =====
 % Re-creates standard GUI for fresh tree
-cellTypeSplit = @(listSorted)splitOnCellType(listSorted);
-cellTypeSplit_java = riekesuite.util.SplitValueFunctionAdapter.buildMap(listSorted, cellTypeSplit);
-
-dateSplit = @(listSorted)splitOnExperimentDate(listSorted);
-dateSplit_java = riekesuite.util.SplitValueFunctionAdapter.buildMap(listSorted, dateSplit);
-
-ndfSplit = @(listSorted)splitOnNDFs(listSorted);
-ndfSplit_java = riekesuite.util.SplitValueFunctionAdapter.buildMap(listSorted, ndfSplit);
-
-brightnessSplit = @(listSorted)splitOnDeviceBrightNess(listSorted);
-brightnessSplit_java = riekesuite.util.SplitValueFunctionAdapter.buildMap(listSorted, brightnessSplit);
-
-tree = riekesuite.analysis.buildTree(listSorted,{cellTypeSplit_java,dateSplit_java, 'cell.label', 'protocolSettings(epochGroup:label)',...
-    brightnessSplit_java, ndfSplit_java,'protocolSettings(onlineAnalysis)'});
-gui = epochTreeGUI(tree);
 %   >> run('analysisCRG')
 
 %% ===== Supp Fig 3A, Fig 6A-B: RF Characterization =====
 % Standard GUI (expanding spots + contrast spots share same splits)
-cellTypeSplit = @(listSorted)splitOnCellType(listSorted);
-cellTypeSplit_java = riekesuite.util.SplitValueFunctionAdapter.buildMap(listSorted, cellTypeSplit);
-
-dateSplit = @(listSorted)splitOnExperimentDate(listSorted);
-dateSplit_java = riekesuite.util.SplitValueFunctionAdapter.buildMap(listSorted, dateSplit);
-
-ndfSplit = @(listSorted)splitOnNDFs(listSorted);
-ndfSplit_java = riekesuite.util.SplitValueFunctionAdapter.buildMap(listSorted, ndfSplit);
-
-brightnessSplit = @(listSorted)splitOnDeviceBrightNess(listSorted);
-brightnessSplit_java = riekesuite.util.SplitValueFunctionAdapter.buildMap(listSorted, brightnessSplit);
-
-tree = riekesuite.analysis.buildTree(listSorted,{cellTypeSplit_java, dateSplit_java, 'cell.label','protocolSettings(epochGroup:label)',...
-    brightnessSplit_java, ndfSplit_java,'protocolSettings(onlineAnalysis)'});
-gui = epochTreeGUI(tree);
 %   >> run('analysisRFCharacterization')
 
 %% ===== Fig 7A-H: Paired-Pulse Spots =====
-rigSplit = @(listSorted)splitOnRigs(listSorted);
-rigSplit_java = riekesuite.util.SplitValueFunctionAdapter.buildMap(listSorted, rigSplit);
-
-cellTypeSplit = @(listSorted)splitOnCellType(listSorted);
-cellTypeSplit_java = riekesuite.util.SplitValueFunctionAdapter.buildMap(listSorted, cellTypeSplit);
-
-dateSplit = @(listSorted)splitOnExperimentDate(listSorted);
-dateSplit_java = riekesuite.util.SplitValueFunctionAdapter.buildMap(listSorted, dateSplit);
-
-tree = riekesuite.analysis.buildTree(listSorted,{cellTypeSplit_java, dateSplit_java,rigSplit_java,'protocolSettings(psth)', ...
-    'cell.label','protocolSettings(epochGroup:label)'});
-gui = epochTreeGUI(tree);
 %   >> run('analysisPairedPulse')  % run PP spots sections
 
 %% ===== Fig 7I-N: Paired-Pulse Gratings =====
-cellTypeSplit = @(listSorted)splitOnCellType(listSorted);
-cellTypeSplit_java = riekesuite.util.SplitValueFunctionAdapter.buildMap(listSorted, cellTypeSplit);
-
-dateSplit = @(listSorted)splitOnExperimentDate(listSorted);
-dateSplit_java = riekesuite.util.SplitValueFunctionAdapter.buildMap(listSorted, dateSplit);
-
-tree = riekesuite.analysis.buildTree(listSorted,{cellTypeSplit_java, dateSplit_java, 'cell.label','protocolSettings(grateContrast)', ...
-    'protocolSettings(psth)'});
-gui = epochTreeGUI(tree);
 %   >> run('analysisPairedPulse')  % run PP gratings sections
 
-%% ===== Methods: Split-Field Centering =====
-cellTypeSplit = @(listSorted)splitOnCellType(listSorted);
-cellTypeSplit_java = riekesuite.util.SplitValueFunctionAdapter.buildMap(listSorted, cellTypeSplit);
 
-dateSplit = @(listSorted)splitOnExperimentDate(listSorted);
-dateSplit_java = riekesuite.util.SplitValueFunctionAdapter.buildMap(listSorted, dateSplit);
 
-splitSplit = @(listSorted)splitOnSplitField(listSorted);
-splitSplit_java = riekesuite.util.SplitValueFunctionAdapter.buildMap(listSorted, splitSplit);
-
-ndfSplit = @(listSorted)splitOnNDFs(listSorted);
-ndfSplit_java = riekesuite.util.SplitValueFunctionAdapter.buildMap(listSorted, ndfSplit);
-
-brightnessSplit = @(listSorted)splitOnDeviceBrightNess(listSorted);
-brightnessSplit_java = riekesuite.util.SplitValueFunctionAdapter.buildMap(listSorted, brightnessSplit);
-
-tree = riekesuite.analysis.buildTree(listSorted,{cellTypeSplit_java,dateSplit_java, 'cell.label', 'protocolSettings(epochGroup:label)',...
-    splitSplit_java,'protocolSettings(onlineAnalysis)',brightnessSplit_java, ndfSplit_java});
-gui = epochTreeGUI(tree);
-%   >> run('analysisSupplementary')  % run centering sections
-
-%% ===== Supp Fig 5: Noise / LN Model =====
-cellTypeSplit = @(listSorted)splitOnCellType(listSorted);
-cellTypeSplit_java = riekesuite.util.SplitValueFunctionAdapter.buildMap(listSorted, cellTypeSplit);
-
-dateSplit = @(listSorted)splitOnExperimentDate(listSorted);
-dateSplit_java = riekesuite.util.SplitValueFunctionAdapter.buildMap(listSorted, dateSplit);
-
-protocolSplit = @(listSorted)splitOnShortProtocolID(listSorted);
-ProtocolSplit_java = riekesuite.util.SplitValueFunctionAdapter.buildMap(listSorted, protocolSplit);
-
-ndfSplit = @(listSorted)splitOnNDFs(listSorted);
-ndfSplit_java = riekesuite.util.SplitValueFunctionAdapter.buildMap(listSorted, ndfSplit);
-
-brightnessSplit = @(listSorted)splitOnDeviceBrightNess(listSorted);
-brightnessSplit_java = riekesuite.util.SplitValueFunctionAdapter.buildMap(listSorted, brightnessSplit);
-
-recordingTypeSplit = @(listSorted)splitOnRecordingType(listSorted);
-recordingTypeSplit_java = riekesuite.util.SplitValueFunctionAdapter.buildMap(listSorted, recordingTypeSplit);
-
-tree = riekesuite.analysis.buildTree(listSorted,{cellTypeSplit_java,dateSplit_java, 'cell.label','protocolSettings(epochGroup:label)',...
-    ProtocolSplit_java, brightnessSplit_java,ndfSplit_java,recordingTypeSplit_java});
-gui = epochTreeGUI(tree);
-%   >> run('analysisSupplementary')  % run noise sections

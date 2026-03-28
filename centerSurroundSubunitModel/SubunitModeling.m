@@ -15,10 +15,10 @@ load AllTuningReversingGrating
 
 %% Visualize single-cell RF and model fit
 cellNo = 7;
-positions = 0:5:400;
-xloc = 0:0.1:400;
-CenterSD = 20;
-SurroundSD = 27;
+positions = 0:10:400;
+xloc = 0:1:400;
+CenterSD = 15;
+SurroundSD = 20;
 surroundWeight = 1.02 * CenterSD / SurroundSD;
 
 % Build DoG receptive field
@@ -57,8 +57,8 @@ legend('data', 'model');
 clc; close all;
 load AllTuningReversingGrating
 
-options = optimset('PlotFcns', 'optimplotfval', 'TolX', 1e-2, 'MaxIter', 200, 'TolFun', 1e-3);
-for cellNo = 7
+options = optimset('PlotFcns', 'optimplotfval', 'TolX', 1e-2, 'MaxIter', 50, 'TolFun', 1e-3);
+for cellNo = 1:21
     [x, fval] = fminsearchbnd(@(x) subunitModelFittingWrapper(x, inhBarAll{cellNo}, inhBarRespAll{cellNo}), ...
         [15 0.9 15 0.3], [12 0.6 10 0], [50 1.05 20 0.6], options);
     figure('position', [100 100 1000 500]);
@@ -79,14 +79,3 @@ xlim([0 50]); ylim([0 1.2]); hold all;
 eb(1) = errorbar(mean(fitOutput(:,1)), mean(fitOutput(:,2)), ste(fitOutput(:,1)), 'horizontal', 'LineStyle', 'none');
 eb(2) = errorbar(mean(fitOutput(:,1)), mean(fitOutput(:,2)), ste(fitOutput(:,2)), 'vertical', 'LineStyle', 'none');
 
-%% Parameter landscape: surround size vs. surround strength
-[xx, yy] = meshgrid(10:1:60, 0.5:0.01:1);
-F = zeros(size(xx));
-for i = 1:size(F, 1)
-    for j = 1:size(F, 2)
-        F(i, j) = subunitModelSup([xx(i,j) yy(i,j)]);
-    end
-end
-figure; surf(xx, yy, F); colorbar;
-figure; contourf(F, 'showtext', 'on'); colorbar;
-figure; surfc(xx, yy, F, 'FaceAlpha', 1); colorbar;
